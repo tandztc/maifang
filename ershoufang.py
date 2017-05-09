@@ -10,22 +10,25 @@ from fake_useragent import UserAgent
 ua = UserAgent()
 
 url_format = "http://{0}.lianjia.com/"
-hds = [{
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.96 Safari/537.36'}
-]
 
 cookie = {'CNZZDATA1253492436': '1218673697-1493718747-null%7C1494294124'}
 
 current_section_name = ""
-suffix = ""
 
 
-def get_regions():
-    while True:
+def spider_get_xml(url):
+    try:
         time.sleep(random.uniform(1, 5))
-        ret = requests.get(root_url + suffix, headers={'User-Agent': ua.random})
+        ret = requests.get(url, headers={'User-Agent': ua.random}, timeout=5)
         page = etree.HTML(ret.content)
+        return page
+    except Exception as e:
+        return None
 
+
+def get_regions(suffix):
+    while True:
+        page = spider_get_xml(root_url+suffix)
         hrefs = page.xpath("//div[@data-role='ershoufang']//a")
 
         # for href in hrefs:
@@ -41,10 +44,7 @@ def get_regions():
 
 def get_section(url):
     while True:
-        time.sleep(random.uniform(1, 5))
-        ret = requests.get(root_url + url, headers={'User-Agent': ua.random})
-        page = etree.HTML(ret.content)
-
+        page = spider_get_xml(root_url + url)
         hrefs = page.xpath("//div[@data-role='ershoufang']/div[2]//a")
 
         sections = {}
@@ -56,10 +56,7 @@ def get_section(url):
 
 def process_onsell_section(url):
     while True:
-        time.sleep(random.uniform(1, 5))
-        ret = requests.get(root_url + url, headers={'User-Agent': ua.random})
-        page = etree.HTML(ret.content)
-
+        page = spider_get_xml(root_url + url)
         data = page.xpath("//*[@class='total fl']/span")
         if len(data) > 0:
             total_num = int(data[0].text)
@@ -81,10 +78,7 @@ def process_onsell_section(url):
 
 def process_onsell_page(url):
     while True:
-        time.sleep(random.uniform(1, 5))
-        ret = requests.get(url, headers={'User-Agent': ua.random})
-        page = etree.HTML(ret.content)
-
+        page = spider_get_xml(url)
         data = page.xpath("//h2[@class='total fl']/span")
         if len(data) > 0:
             break
@@ -94,6 +88,7 @@ def process_onsell_page(url):
         process_onsell_house(house_ref)
         # process_onsell_unit(house_ref.attrib['href'])
         # print(house_ref.attrib['href'])
+
 
 def process_onsell_house(house_ref):
     try:
@@ -116,12 +111,10 @@ def process_onsell_house(house_ref):
     except Exception as e:
         pass
 
+
 def process_onsell_unit(url):
     for i in range(0, 16):
-        time.sleep(random.uniform(1, 5))
-        ret = requests.get(url, headers={'User-Agent': ua.random})
-        page = etree.HTML(ret.content)
-
+        page = spider_get_xml(url)
         data = page.xpath("//div[@class='price ']/span[1]")
         if len(data) > 0:
             break
@@ -148,10 +141,7 @@ def process_onsell_unit(url):
 
 def process_traded_section(url):
     while True:
-        time.sleep(random.uniform(1, 5))
-        ret = requests.get(root_url + url, headers={'User-Agent': ua.random})
-        page = etree.HTML(ret.content)
-
+        page = spider_get_xml(root_url + url)
         data = page.xpath("//*[@class='total fl']/span")
         if len(data) > 0:
             total_num = int(data[0].text)
@@ -164,18 +154,20 @@ def process_traded_section(url):
 
 
 def process_traded_page(url):
-    while True:
-        time.sleep(random.uniform(1, 5))
-        ret = requests.get(url, headers={'User-Agent': ua.random})
-        page = etree.HTML(ret.content)
-
+    index = 16
+    while index > 0:
+        page = spider_get_xml(url)
         data = page.xpath("//*[@class='total fl']/span")
         if len(data) > 0:
             break
-
+        index -= 1
+    if index == 0:
+        print("get stuck in page {}", url)
+        return
     house_refs = page.xpath("//ul[@class='listContent']/li")
     for house_ref in house_refs:
         process_traded_house(house_ref)
+
 
 def process_traded_house(house_ref):
     try:
@@ -208,8 +200,9 @@ if __name__ == '__main__':
         processor = process_onsell_section
 
     root_url = url_format.format(args.city)
-    process_onsell_section("/ershoufang/cuiyuan/")
-    regions = get_regions()
+    # process_onsell_section("/ershoufang/cuiyuan/")
+    # process_traded_page("http://hz.lianjia.com/chengjiao/shenhua/pg15/")
+    regions = get_regions(suffix)
     print(regions)
     sections = {}
     for region in regions:
@@ -221,4 +214,3 @@ if __name__ == '__main__':
     for section in sections:
         current_section_name = sections[section]
         processor(section)
-    pass
